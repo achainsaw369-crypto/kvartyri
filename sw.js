@@ -1,4 +1,4 @@
-const CACHE='kvartiry-v1';
+const CACHE='kvartiry-v2';
 const FILES=['./','index.html','manifest.json','icon-180.png','icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
@@ -18,5 +18,13 @@ self.addEventListener('fetch',e=>{
   e.respondWith(caches.match(req).then(hit=>{
     const net=fetch(req,{cache:'no-store'}).then(store).catch(()=>hit);
     return hit||net;
+  }));
+});
+/* нажатие на уведомление открывает приложение */
+self.addEventListener('notificationclick',e=>{
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(list=>{
+    for(const c of list){if('focus' in c)return c.focus()}
+    return self.clients.openWindow('./');
   }));
 });

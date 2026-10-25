@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Значок уведомлений: дом с полосой месяцев, одним цветом (Android сам окрашивает его) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2.6L1.6,10.4l1.2,1.6L4,11.1V21h16v-9.9l1.2,0.9l1.2,-1.6L12,2.6zM18,19H6V9.6l6,-4.5l6,4.5V19z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7.5,13.5h2v2.5h-2zM11,13.5h2v2.5h-2zM14.5,13.5h2v2.5h-2z" />
+</vector>
