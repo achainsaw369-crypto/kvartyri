@@ -1,0 +1,124 @@
+name: Сборка Android-приложения (APK)
+
+# Запускается само, когда меняется index.html или папка android-app,
+# и вручную: вкладка Actions → «Сборка Android-приложения» → Run workflow.
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'index.html'
+      - 'android-app/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-build
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Проверить ключ подписи
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -z "$KS" ] || [ -z "$KS_PASS" ] || [ -z "$KEY_ALIAS" ]; then
+            echo "::error::Не заданы секреты подписи (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS). Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - name: Узнать версию из index.html
+        id: ver
+        run: |
+          VER=$(grep -oP "const VERSION='\K[^']+" index.html | head -1)
+          if [ -z "$VER" ]; then echo "::error::В index.html не найдена строка const VERSION='…'"; exit 1; fi
+          IFS=. read -r A B C <<< "$VER"
+          CODE=$(( 10#${A:-0} * 1000000 + 10#${B:-0} * 1000 + 10#${C:-0} ))
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "Версия $VER, versionCode $CODE"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Подготовить веб-часть
+        run: |
+          mkdir -p android-app/www
+          cp index.html android-app/www/index.html
+          sed -i "s#const GH_REPO='';#const GH_REPO='${GITHUB_REPOSITORY}';#" android-app/www/index.html
+          grep -q "const GH_REPO='${GITHUB_REPOSITORY}';" android-app/www/index.html
+
+      - name: Создать Android-проект
+        working-directory: android-app
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add android
+          npx capacitor-assets generate --android --assetPath assets
+          cp -r res-override/. android/app/src/main/res/
+          npx cap sync android
+          sed -i "s/versionCode 1$/versionCode ${{ steps.ver.outputs.code }}/; s/versionName \"1.0\"/versionName \"${{ steps.ver.outputs.ver }}\"/" android/app/build.gradle
+          grep -E "versionCode|versionName" android/app/build.gradle
+
+      - name: Подготовить Android SDK
+        working-directory: android-app
+        run: |
+          PLAT=$(grep -oP 'compileSdkVersion = \K\d+' android/variables.gradle)
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ -x "$SDKM" ]; then
+            yes | "$SDKM" --licenses > /dev/null || true
+            "$SDKM" "platforms;android-$PLAT" || true
+          fi
+
+      - name: Собрать APK
+        working-directory: android-app/android
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Подписать APK
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          echo "$KS" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/release.jks"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          UNSIGNED=$(ls android-app/android/app/build/outputs/apk/release/*.apk | head -1)
+          : "${KEY_PASS:=$KS_PASS}"
+          export KEY_PASS
+          "$BT/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KS_PASS --key-pass env:KEY_PASS --out kvartiry.apk "$UNSIGNED"
+          "$BT/apksigner" verify --print-certs kvartiry.apk
+          rm -f "$RUNNER_TEMP/release.jks"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kvartiry-apk
+          path: kvartiry.apk
+
+      - name: Опубликовать в Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ steps.ver.outputs.ver }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" kvartiry.apk --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" kvartiry.apk --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest \
+              --title "Версия ${{ steps.ver.outputs.ver }}" \
+              --notes "Скачай kvartiry.apk и открой его на телефоне. Новая версия ставится поверх старой, данные сохраняются."
+          fi
