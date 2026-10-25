@@ -1,0 +1,17 @@
+{
+  "name": "kvartiry-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Обёртка «Мои квартиры» для Android (Capacitor). Собирается на GitHub Actions.",
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/filesystem": "8.1.5",
+    "@capacitor/share": "8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.3"
+  }
+}

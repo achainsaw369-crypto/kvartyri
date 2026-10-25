@@ -1,0 +1,14 @@
+{
+  "appId": "app.kvartiry.rent",
+  "appName": "Мои квартиры",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#E9EEF1"
+  },
+  "plugins": {
+    "SystemBars": {
+      "style": "LIGHT",
+      "insetsHandling": "css"
+    }
+  }
+}
