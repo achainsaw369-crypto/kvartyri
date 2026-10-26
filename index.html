@@ -299,7 +299,7 @@ nav{flex:none;background:var(--surf);border-top:1px solid var(--line);display:gr
 <script>
 'use strict';
 /* ================= основа ================= */
-const VERSION='1.2.0';
+const VERSION='1.2.1';
 /* Android-приложение: при сборке на GitHub сюда подставляется «владелец/репозиторий», откуда берутся новые версии APK */
 const GH_REPO='';
 const KEY='kvartiry.v1', DEVKEY='kvartiry.device';
@@ -668,7 +668,7 @@ function flatItem(f){
     const soon=pw&&!pw.ahead&&diffD(today(),pw.date)<=cfgN(db.cfg.dueSoon,3);
     right=(od>0?`<span class="chip debt">долг ${fM(od)}</span>`:pw&&pw.now?`<span class="chip soon">к оплате</span>`:soon?`<span class="chip soon">скоро платёж</span>`:`<span class="chip paid">оплачено</span>`)+(line?`<small>${line}</small>`:'');
   }
-  return`<button class="fl" data-a="go" data-v="flat" data-id="${f.id}"><div class="t"><b>${esc(addrShort(f))}</b><small>${esc(flatName(f))} · ${esc(sub)}</small></div><div class="v">${right}</div></button>`;
+  return`<button class="fl" data-a="go" data-v="flat" data-id="${f.id}"><div class="t"><b>${esc(flatName(f))}</b><small>${esc(addrShort(f))} · ${esc(sub)}</small></div><div class="v">${right}</div></button>`;
 }
 
 P.summary=()=>{
@@ -696,7 +696,7 @@ P.summary=()=>{
       <div class="shead"><span>Объект</span><span>Платёж</span><span>Долг</span></div>
       ${rows.map(x=>{const pw=x.pw,soon=pw&&!pw.ahead&&diffD(t,pw.date)<=cfgN(db.cfg.dueSoon,3);
         return`<button class="srow" data-a="go" data-v="flat" data-id="${x.c.flat}">
-        <div><b>${esc(addrShort(x.f))}</b><small>${esc(flatName(x.f))} · ${esc(shortFio(x.tn.fio))}</small></div>
+        <div><b>${esc(flatName(x.f))}</b><small>${esc(addrShort(x.f))} · ${esc(shortFio(x.tn.fio))}</small></div>
         <div>${pw?pw.ahead?`<b class="pos">оплачено</b><small>до ${fDs(pw.date)}</small>`:`<b class="${soon?'soonc':''}">${whenText(pw.date)}</b><small>${fM(pw.amt)}</small>`:'<span class="mute">—</span>'}</div>
         <div>${x.i.overdue>0?`<b class="neg">${fM(x.i.overdue)}</b><small>${days(diffD(x.i.oldest,t))}</small>`:'<span class="mute">—</span>'}</div></button>`}).join('')}
       <div class="srow tot"><div>Итого</div><div class="num">${fM(totNext)}</div><div class="num ${totDebt>0?'neg':''}">${fM(totDebt)}</div></div></div>`;
@@ -705,7 +705,7 @@ P.summary=()=>{
   const debtClosed=db.contracts.filter(c=>!isActive(c)&&ci(c).bal>0.004);
   if(debtClosed.length)h+=`<div class="gt">Долги выехавших</div><div class="grp">${debtClosed.map(c=>`<button class="row tap" data-a="go" data-v="contract" data-id="${c.id}"><div class="t"><b>${esc(cLabel(c))}</b><small>выехал ${fD(c.closeDate)}</small></div><div class="v neg">${fM(ci(c).bal)}</div></button>`).join('')}</div>`;
   const free=db.flats.filter(f=>!flatContracts(f).length).sort(sortFlats);
-  if(free.length)h+=`<div class="gt">Свободные<span>${free.length}</span></div><div class="grp">${free.map(f=>`<button class="row tap" data-a="go" data-v="flat" data-id="${f.id}"><div class="t"><b>${esc(flatLabel(f))}</b>${f.rentBase?`<small>ставка ${fM(f.rentBase)}</small>`:''}</div></button>`).join('')}</div>`;
+  if(free.length)h+=`<div class="gt">Свободные<span>${free.length}</span></div><div class="grp">${free.map(f=>`<button class="row tap" data-a="go" data-v="flat" data-id="${f.id}"><div class="t"><b>${esc(flatName(f))}</b><small>${esc(addrShort(f))}${f.rentBase?' · ставка '+fM(f.rentBase):''}</small></div></button>`).join('')}</div>`;
   const al=alerts().filter(a=>!a.pay);
   if(al.length)h+=`<div class="gt">Напоминания<span>${al.length}</span></div><div class="grp">${al.map(a=>`<button class="row al tap ${a.l}" data-a="go" data-r='${esc(JSON.stringify(a.r))}'><div class="t"><b class="wrap">${esc(a.title)}</b><small>${esc(a.sub)}</small></div></button>`).join('')}</div>`;
   if(act.length){
@@ -776,7 +776,7 @@ P.flat=r=>{
   const all=db.contracts.filter(c=>c.flat===f.id);
   const cs=all.filter(isActive);
   const fp=esc(JSON.stringify({flat:f.id}));
-  let o=hd(f.address||flatName(f),esc(flatName(f)),'');
+  let o=hd(flatName(f),esc(f.address||''),'');
   o+=`<div class="ftabs" role="tablist">${FTABS.map(([k,l])=>`<button role="tab" aria-selected="${ft===k}" class="${ft===k?'on':''}" data-a="ftab" data-t="${k}">${l}</button>`).join('')}</div>`;
   /* --- жилец и оплата --- */
   if(ft==='pay'){
@@ -1204,7 +1204,7 @@ const F={
   flats:{title:'Объект',fields:[
     {k:'_copy',l:'Общая информация как у объекта',t:'select',show:d=>d._new&&db.flats.length>0,opts:()=>[['','— заполнить заново —'],...db.flats.map(f=>[f.id,flatLabel(f)]).sort((a,b)=>a[1].localeCompare(b[1],'ru'))],hint:'Скопирует адрес, УК и аварийные телефоны'},
     {k:'address',l:'Адрес',req:1,ph:'Город, улица, дом, корпус'},
-    {k:'name',l:'Название',ph:'Например: Студия у метро',hint:'Показывается под адресом. Если пусто — тип и номер, например «Кв. 12»'},
+    {k:'name',l:'Название',ph:'Например: Студия у метро',hint:'Показывается крупно, адрес — под ним. Если пусто — тип и номер, например «Кв. 12»'},
     {k:'type',l:'Тип',t:'select',half:1,opts:()=>opt(FLAT_TYPES)},{k:'num',l:'Номер',half:1,ph:'12'},
     {k:'rooms',l:'Комнат',t:'num',half:1},{k:'floor',l:'Этаж',half:1},
     {k:'rentBase',l:'Ставка аренды, ₽',t:'money'},
